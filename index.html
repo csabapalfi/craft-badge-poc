@@ -47,17 +47,12 @@
     <b>What this shows:</b> the badge QR is the bare Tito ticket ID. The ID maps to
     <code>https://ti.to/tickets/&lt;id&gt;</code>, whose public page (and <code>.json</code>) returns
     the attendee's full record (name, employer, work + personal email, mobile, demographics)
-    with no login.<br><br>
-    <b>Gated on purpose:</b> this public page only opens the author's own demo badge and
-    refuses every other ID, so it cannot be used against other attendees.
-    Found on my own ticket; reported privately to the organisers.
+    with no login.
   </p>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
-  // Only this ticket is ever opened. Any other badge -> refused.
-  var ALLOWED = "ti_p05PRGNpriDTy6fgd1kkPJw";
   var panel = document.getElementById("panel");
   var done = false;
 
