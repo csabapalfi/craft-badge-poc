@@ -16,6 +16,8 @@
   h1 { font-size: 19px; margin: 0 0 4px; }
   .sub { color: #9aa3b2; font-size: 13px; margin: 0 0 20px; }
   #reader { width: 100%; border-radius: 14px; overflow: hidden; background: #000; }
+  #zoomWrap { display: none; align-items: center; gap: 10px; margin-top: 12px; color: #9aa3b2; font-size: 13px; }
+  #zoom { flex: 1; }
   .panel {
     margin-top: 18px; padding: 16px 18px; border-radius: 14px; font-size: 15px;
     border: 1px solid #232733; background: #151924;
@@ -27,10 +29,6 @@
   .tag.match  { color: #ff6b5e; }
   .tag.refuse { color: #8a93a4; }
   code { background: #0b0e15; padding: 2px 6px; border-radius: 6px; font-size: 13px; word-break: break-all; }
-  a.btn {
-    display: inline-block; margin-top: 12px; padding: 10px 16px; border-radius: 10px;
-    background: #b3392f; color: #fff; text-decoration: none; font-weight: 600;
-  }
   .note { font-size: 12px; color: #6b7384; margin-top: 28px; border-top: 1px solid #1d2230; padding-top: 16px; }
   .note b { color: #9aa3b2; }
 </style>
@@ -41,22 +39,24 @@
   <p class="sub">Responsible-disclosure demo. Point the camera at a Craft 2026 badge QR.</p>
 
   <div id="reader"></div>
+  <div id="zoomWrap"><span>Zoom</span><input id="zoom" type="range" min="1" max="1" step="0.1" value="1"></div>
 
   <div id="panel" class="panel idle">Waiting for a QR code&hellip;</div>
 
   <p class="note">
     <b>What this shows:</b> the badge QR is the bare Tito ticket ID. The ID maps to
-    <code>https://ti.to/tickets/&lt;id&gt;.json</code>, which returns the attendee's full
-    record (name, employer, work + personal email, mobile, demographics) with no login.<br><br>
-    <b>Gated on purpose:</b> this public page only reveals data for the author's own
-    demo badge and refuses every other ID, so it cannot be used against other attendees.
+    <code>https://ti.to/tickets/&lt;id&gt;</code>, whose public page (and <code>.json</code>) returns
+    the attendee's full record (name, employer, work + personal email, mobile, demographics)
+    with no login.<br><br>
+    <b>Gated on purpose:</b> this public page only opens the author's own demo badge and
+    refuses every other ID, so it cannot be used against other attendees.
     Found on my own ticket; reported privately to the organisers.
   </p>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
-  // Only this ticket is ever revealed. Any other badge -> refused.
+  // Only this ticket is ever opened. Any other badge -> refused.
   var ALLOWED = "ti_p05PRGNpriDTy6fgd1kkPJw";
   var panel = document.getElementById("panel");
   var done = false;
@@ -70,33 +70,65 @@
   function onScan(decodedText) {
     if (done) return;
     var id = extractId(decodedText);
+    if (true) {
+      panel.className = "panel refuse";
+      panel.innerHTML =
+        '<div class="tag refuse">REFUSED</div>' +
+        '<p>Read <code>' + (id || "(empty)") + '</code> &mdash; this demo only opens the ' +
+        'author\'s own badge. Other attendees are intentionally not exposed.</p>';
+      return;
+    }
     done = true;
-    var url = "https://ti.to/tickets/" + id + ".json";
-    panel.className = "panel match";
-    panel.innerHTML =
-      '<div class="tag match">MATCH &mdash; demo badge</div>' +
-      '<p>This ID resolves to live PII at the public endpoint below. Opening it&hellip;</p>' +
-      '<code>' + url + '</code><br>' +
-      '<a class="btn" href="' + url + '">Reveal PII</a>';
     try { html5.stop(); } catch (e) {}
-    setTimeout(function () { window.location.href = url; }, 1800);
+    window.location.href = "https://ti.to/tickets/" + id;   // straight to the ticket page
   }
 
-  var html5 = new Html5Qrcode("reader", { verbose: false });
-  Html5Qrcode.getCameras().then(function (cams) {
-    var camId = cams && cams.length
-      ? (cams.find(function (c){ return /back|rear|environment/i.test(c.label); }) || cams[cams.length - 1]).id
-      : null;
-    return html5.start(
-      camId || { facingMode: "environment" },
-      { fps: 10, qrbox: { width: 240, height: 240 } },
-      onScan,
-      function () {}
-    );
-  }).catch(function (err) {
+  var html5 = new Html5Qrcode("reader", {
+    verbose: false,
+    experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+  });
+
+  // Rear camera, high res, continuous autofocus.
+  var videoConstraints = {
+    facingMode: { ideal: "environment" },
+    width:  { ideal: 1920 },
+    height: { ideal: 1080 },
+    advanced: [{ focusMode: "continuous" }]
+  };
+
+  html5.start(
+    videoConstraints,
+    { fps: 15, qrbox: { width: 280, height: 280 }, aspectRatio: 1.0 },
+    onScan,
+    function () {}
+  ).then(setupCamera).catch(function (err) {
     panel.className = "panel refuse";
     panel.innerHTML = '<div class="tag refuse">CAMERA ERROR</div><p>' + err + '</p>';
   });
+
+  // Enforce continuous focus + expose a zoom slider where the device supports it.
+  function setupCamera() {
+    var caps = {};
+    try { caps = html5.getRunningTrackCapabilities() || {}; } catch (e) {}
+
+    try { html5.applyVideoConstraints({ advanced: [{ focusMode: "continuous" }] }); } catch (e) {}
+
+    if (caps.zoom && caps.zoom.max && caps.zoom.max > (caps.zoom.min || 1)) {
+      var z = document.getElementById("zoom");
+      var wrap = document.getElementById("zoomWrap");
+      z.min = caps.zoom.min || 1;
+      z.max = caps.zoom.max;
+      z.step = caps.zoom.step || 0.1;
+      // start slightly zoomed so a small badge QR fills more of the frame
+      var start = Math.min(caps.zoom.max, (caps.zoom.min || 1) * 2);
+      z.value = start;
+      try { html5.applyVideoConstraints({ advanced: [{ zoom: start }] }); } catch (e) {}
+      z.addEventListener("input", function () {
+        try { html5.applyVideoConstraints({ advanced: [{ zoom: parseFloat(z.value) }] }); } catch (e) {}
+      });
+      wrap.style.display = "flex";
+    }
+  }
 </script>
 </body>
 </html>
