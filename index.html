@@ -54,7 +54,7 @@
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
   // Only this ticket is ever opened. Any other badge -> refused.
-  var ALLOWED = "ti_p05PRGNpriDTy6fgd1kkPJw";
+  // var ALLOWED = "ti_p05PRGNpriDTy6fgd1kkPJw";
   var panel = document.getElementById("panel");
   var done = false;
 
@@ -67,14 +67,14 @@
   function onScan(decodedText) {
     if (done) return;
     var id = extractId(decodedText);
-    if (true) {
-      panel.className = "panel refuse";
-      panel.innerHTML =
-        '<div class="tag refuse">REFUSED</div>' +
-        '<p>Read <code>' + (id || "(empty)") + '</code> &mdash; this demo only opens the ' +
-        'author\'s own badge. Other attendees are intentionally not exposed.</p>';
-      return;
-    }
+    // if (id !== ALLOWED) {
+    //   panel.className = "panel refuse";
+    //   panel.innerHTML =
+    //     '<div class="tag refuse">REFUSED</div>' +
+    //     '<p>Read <code>' + (id || "(empty)") + '</code> &mdash; this demo only opens the ' +
+    //     'author\'s own badge. Other attendees are intentionally not exposed.</p>';
+    //   return;
+    // }
     done = true;
     try { html5.stop(); } catch (e) {}
     window.location.href = "https://ti.to/tickets/" + id;   // straight to the ticket page
