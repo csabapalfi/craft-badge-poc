@@ -70,24 +70,16 @@
   function onScan(decodedText) {
     if (done) return;
     var id = extractId(decodedText);
-    if (id === ALLOWED) {
-      done = true;
-      var url = "https://ti.to/tickets/" + id + ".json";
-      panel.className = "panel match";
-      panel.innerHTML =
-        '<div class="tag match">MATCH &mdash; demo badge</div>' +
-        '<p>This ID resolves to live PII at the public endpoint below. Opening it&hellip;</p>' +
-        '<code>' + url + '</code><br>' +
-        '<a class="btn" href="' + url + '">Reveal PII</a>';
-      try { html5.stop(); } catch (e) {}
-      setTimeout(function () { window.location.href = url; }, 1800);
-    } else {
-      panel.className = "panel refuse";
-      panel.innerHTML =
-        '<div class="tag refuse">REFUSED</div>' +
-        '<p>Read <code>' + (id || "(empty)") + '</code> &mdash; this demo only reveals the ' +
-        'author\'s own badge. Other attendees are intentionally not exposed.</p>';
-    }
+    done = true;
+    var url = "https://ti.to/tickets/" + id + ".json";
+    panel.className = "panel match";
+    panel.innerHTML =
+      '<div class="tag match">MATCH &mdash; demo badge</div>' +
+      '<p>This ID resolves to live PII at the public endpoint below. Opening it&hellip;</p>' +
+      '<code>' + url + '</code><br>' +
+      '<a class="btn" href="' + url + '">Reveal PII</a>';
+    try { html5.stop(); } catch (e) {}
+    setTimeout(function () { window.location.href = url; }, 1800);
   }
 
   var html5 = new Html5Qrcode("reader", { verbose: false });
