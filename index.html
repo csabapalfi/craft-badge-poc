@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="robots" content="noindex,nofollow">
+<title>Badge QR &rarr; PII (gated demo)</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: #0d0f14; color: #e6e8ee; -webkit-text-size-adjust: 100%;
+  }
+  main { max-width: 560px; margin: 0 auto; padding: 24px 18px 64px; }
+  h1 { font-size: 19px; margin: 0 0 4px; }
+  .sub { color: #9aa3b2; font-size: 13px; margin: 0 0 20px; }
+  #reader { width: 100%; border-radius: 14px; overflow: hidden; background: #000; }
+  .panel {
+    margin-top: 18px; padding: 16px 18px; border-radius: 14px; font-size: 15px;
+    border: 1px solid #232733; background: #151924;
+  }
+  .panel.match  { border-color: #b3392f; background: #2a1714; }
+  .panel.refuse { border-color: #3a4150; background: #161b27; }
+  .panel.idle   { color: #9aa3b2; }
+  .tag { font-weight: 700; letter-spacing: .02em; }
+  .tag.match  { color: #ff6b5e; }
+  .tag.refuse { color: #8a93a4; }
+  code { background: #0b0e15; padding: 2px 6px; border-radius: 6px; font-size: 13px; word-break: break-all; }
+  a.btn {
+    display: inline-block; margin-top: 12px; padding: 10px 16px; border-radius: 10px;
+    background: #b3392f; color: #fff; text-decoration: none; font-weight: 600;
+  }
+  .note { font-size: 12px; color: #6b7384; margin-top: 28px; border-top: 1px solid #1d2230; padding-top: 16px; }
+  .note b { color: #9aa3b2; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Badge QR &rarr; attendee PII</h1>
+  <p class="sub">Responsible-disclosure demo. Point the camera at a Craft 2026 badge QR.</p>
+
+  <div id="reader"></div>
+
+  <div id="panel" class="panel idle">Waiting for a QR code&hellip;</div>
+
+  <p class="note">
+    <b>What this shows:</b> the badge QR is the bare Tito ticket ID. The ID maps to
+    <code>https://ti.to/tickets/&lt;id&gt;.json</code>, which returns the attendee's full
+    record (name, employer, work + personal email, mobile, demographics) with no login.<br><br>
+    <b>Gated on purpose:</b> this public page only reveals data for the author's own
+    demo badge and refuses every other ID, so it cannot be used against other attendees.
+    Found on my own ticket; reported privately to the organisers.
+  </p>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+  // Only this ticket is ever revealed. Any other badge -> refused.
+  var ALLOWED = "ti_p05PRGNpriDTy6fgd1kkPJw";
+  var panel = document.getElementById("panel");
+  var done = false;
+
+  function extractId(text) {
+    text = (text || "").trim();
+    var m = text.match(/ti_[A-Za-z0-9]+/);
+    return m ? m[0] : text;
+  }
+
+  function onScan(decodedText) {
+    if (done) return;
+    var id = extractId(decodedText);
+    if (id === ALLOWED) {
+      done = true;
+      var url = "https://ti.to/tickets/" + id + ".json";
+      panel.className = "panel match";
+      panel.innerHTML =
+        '<div class="tag match">MATCH &mdash; demo badge</div>' +
+        '<p>This ID resolves to live PII at the public endpoint below. Opening it&hellip;</p>' +
+        '<code>' + url + '</code><br>' +
+        '<a class="btn" href="' + url + '">Reveal PII</a>';
+      try { html5.stop(); } catch (e) {}
+      setTimeout(function () { window.location.href = url; }, 1800);
+    } else {
+      panel.className = "panel refuse";
+      panel.innerHTML =
+        '<div class="tag refuse">REFUSED</div>' +
+        '<p>Read <code>' + (id || "(empty)") + '</code> &mdash; this demo only reveals the ' +
+        'author\'s own badge. Other attendees are intentionally not exposed.</p>';
+    }
+  }
+
+  var html5 = new Html5Qrcode("reader", { verbose: false });
+  Html5Qrcode.getCameras().then(function (cams) {
+    var camId = cams && cams.length
+      ? (cams.find(function (c){ return /back|rear|environment/i.test(c.label); }) || cams[cams.length - 1]).id
+      : null;
+    return html5.start(
+      camId || { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 240, height: 240 } },
+      onScan,
+      function () {}
+    );
+  }).catch(function (err) {
+    panel.className = "panel refuse";
+    panel.innerHTML = '<div class="tag refuse">CAMERA ERROR</div><p>' + err + '</p>';
+  });
+</script>
+</body>
+</html>
