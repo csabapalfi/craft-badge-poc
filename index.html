@@ -53,6 +53,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
+  // Only this ticket is ever opened. Any other badge -> refused.
+  var ALLOWED = "ti_p05PRGNpriDTy6fgd1kkPJw";
   var panel = document.getElementById("panel");
   var done = false;
 
@@ -83,29 +85,44 @@
     experimentalFeatures: { useBarCodeDetectorIfSupported: true }
   });
 
-  // Rear camera, high res, continuous autofocus.
-  var videoConstraints = {
-    facingMode: { ideal: "environment" },
-    width:  { ideal: 1920 },
-    height: { ideal: 1080 },
-    advanced: [{ focusMode: "continuous" }]
-  };
+  // Size the scan box to the live video so it never exceeds the frame (an iOS error source).
+  function qrbox(vw, vh) {
+    var m = Math.floor(Math.min(vw, vh) * 0.75);
+    return { width: m, height: m };
+  }
 
-  html5.start(
-    videoConstraints,
-    { fps: 15, qrbox: { width: 280, height: 280 }, aspectRatio: 1.0 },
-    onScan,
-    function () {}
-  ).then(setupCamera).catch(function (err) {
+  // iOS needs a user gesture, HTTPS, and minimal start constraints (no advanced focus/zoom,
+  // which throw OverconstrainedError on Safari). Focus/zoom are tuned AFTER the stream starts.
+  function startScan() {
+    panel.className = "panel idle";
+    panel.textContent = "Starting camera…";
+    html5.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: qrbox },
+      onScan,
+      function () {}
+    ).then(function () {
+      panel.textContent = "Point at a badge QR…";
+      tuneCamera();
+    }).catch(showCamError);
+  }
+
+  function showCamError(err) {
+    var name = (err && err.name) ? err.name : "";
+    var msg  = (err && err.message) ? err.message : String(err);
     panel.className = "panel refuse";
-    panel.innerHTML = '<div class="tag refuse">CAMERA ERROR</div><p>' + err + '</p>';
-  });
+    panel.innerHTML =
+      '<div class="tag refuse">CAMERA ERROR</div>' +
+      '<p>' + (name ? name + ': ' : '') + msg + '</p>' +
+      '<p style="font-size:13px;color:#9aa3b2">On iOS this is almost always one of: the page is not ' +
+      'served over HTTPS, camera permission was denied, or the camera is in use by another app. ' +
+      'Open the https:// link, allow the camera, then reload.</p>';
+  }
 
-  // Enforce continuous focus + expose a zoom slider where the device supports it.
-  function setupCamera() {
+  // Best-effort: continuous focus + zoom slider where supported (iOS silently ignores both).
+  function tuneCamera() {
     var caps = {};
     try { caps = html5.getRunningTrackCapabilities() || {}; } catch (e) {}
-
     try { html5.applyVideoConstraints({ advanced: [{ focusMode: "continuous" }] }); } catch (e) {}
 
     if (caps.zoom && caps.zoom.max && caps.zoom.max > (caps.zoom.min || 1)) {
@@ -114,16 +131,17 @@
       z.min = caps.zoom.min || 1;
       z.max = caps.zoom.max;
       z.step = caps.zoom.step || 0.1;
-      // start slightly zoomed so a small badge QR fills more of the frame
-      var start = Math.min(caps.zoom.max, (caps.zoom.min || 1) * 2);
-      z.value = start;
-      try { html5.applyVideoConstraints({ advanced: [{ zoom: start }] }); } catch (e) {}
+      var startZoom = Math.min(caps.zoom.max, (caps.zoom.min || 1) * 2);
+      z.value = startZoom;
+      try { html5.applyVideoConstraints({ advanced: [{ zoom: startZoom }] }); } catch (e) {}
       z.addEventListener("input", function () {
         try { html5.applyVideoConstraints({ advanced: [{ zoom: parseFloat(z.value) }] }); } catch (e) {}
       });
       wrap.style.display = "flex";
     }
   }
+
+  startScan();
 </script>
 </body>
 </html>
